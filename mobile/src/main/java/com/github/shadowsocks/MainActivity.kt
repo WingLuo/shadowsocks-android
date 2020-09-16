@@ -20,13 +20,8 @@
 
 package com.github.shadowsocks
 
-import android.app.Activity
-import android.app.backup.BackupManager
 import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.VpnService
 import android.os.Bundle
-import android.os.Handler
 import android.os.RemoteException
 import android.view.*
 import androidx.appcompat.app.AppCompatActivity
@@ -48,7 +43,7 @@ import com.github.shadowsocks.preference.DataStore
 import com.github.shadowsocks.preference.OnPreferenceDataStoreChangeListener
 import com.github.shadowsocks.subscription.SubscriptionFragment
 import com.github.shadowsocks.utils.Key
-import com.github.shadowsocks.utils.SingleInstanceActivity
+import com.github.shadowsocks.utils.StartService
 import com.github.shadowsocks.widget.ListHolderListener
 import com.github.shadowsocks.widget.ServiceButton
 import com.github.shadowsocks.widget.StatsBar
@@ -57,13 +52,10 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.analytics.ktx.logEvent
 import com.google.firebase.ktx.Firebase
-import timber.log.Timber
 
 class MainActivity : AppCompatActivity(), ShadowsocksConnection.Callback, OnPreferenceDataStoreChangeListener,
         NavigationView.OnNavigationItemSelectedListener {
     companion object {
-        private const val REQUEST_CONNECT = 1
-
         var stateListener: ((BaseService.State) -> Unit)? = null
     }
 
@@ -120,18 +112,9 @@ class MainActivity : AppCompatActivity(), ShadowsocksConnection.Callback, OnPref
         stateListener?.invoke(state)
     }
 
-    private fun toggle() = when {
-        state.canStop -> Core.stopService()
-        DataStore.serviceMode == Key.modeVpn -> {
-            val intent = VpnService.prepare(this)
-            if (intent != null) startActivityForResult(intent, REQUEST_CONNECT)
-            else onActivityResult(REQUEST_CONNECT, Activity.RESULT_OK, null)
-        }
-        else -> Core.startService()
-    }
+    private fun toggle() = if (state.canStop) Core.stopService() else connect.launch(null)
 
-    private val handler = Handler()
-    private val connection = ShadowsocksConnection(handler, true)
+    private val connection = ShadowsocksConnection(true)
     override fun onServiceConnected(service: IShadowsocksService) = changeState(try {
         BaseService.State.values()[service.state]
     } catch (_: RemoteException) {
@@ -143,20 +126,12 @@ class MainActivity : AppCompatActivity(), ShadowsocksConnection.Callback, OnPref
         connection.connect(this, this)
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        when {
-            requestCode != REQUEST_CONNECT -> super.onActivityResult(requestCode, resultCode, data)
-            resultCode == Activity.RESULT_OK -> Core.startService()
-            else -> {
-                snackbar().setText(R.string.vpn_permission_denied).show()
-                Timber.e("Failed to start VpnService from onActivityResult: $data")
-            }
-        }
+    private val connect = registerForActivityResult(StartService()) {
+        if (it) snackbar().setText(R.string.vpn_permission_denied).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        SingleInstanceActivity.register(this) ?: return
         setContentView(R.layout.layout_main)
         snackbar = findViewById(R.id.snackbar)
         snackbar.setOnApplyWindowInsetsListener(ListHolderListener)
@@ -188,7 +163,7 @@ class MainActivity : AppCompatActivity(), ShadowsocksConnection.Callback, OnPref
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {
-            Key.serviceMode -> handler.post {
+            Key.serviceMode -> {
                 connection.disconnect(this)
                 connection.connect(this, this)
             }
@@ -266,7 +241,5 @@ class MainActivity : AppCompatActivity(), ShadowsocksConnection.Callback, OnPref
         super.onDestroy()
         DataStore.publicStore.unregisterChangeListener(this)
         connection.disconnect(this)
-        BackupManager(this).dataChanged()
-        handler.removeCallbacksAndMessages(null)
     }
 }

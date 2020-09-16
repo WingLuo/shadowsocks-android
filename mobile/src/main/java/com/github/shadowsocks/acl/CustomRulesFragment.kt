@@ -24,7 +24,6 @@ import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
 import android.text.Editable
@@ -362,7 +361,7 @@ class CustomRulesFragment : ToolbarFragment(), Toolbar.OnMenuItemClickListener, 
     }
 
     private val isEnabled get() = (activity as? MainActivity)?.state == BaseService.State.Stopped ||
-            Core.currentProfile?.first?.route != Acl.CUSTOM_RULES
+            Core.currentProfile?.main?.route != Acl.CUSTOM_RULES
 
     private val selectedItems = HashSet<Any>()
     private val adapter by lazy { AclRulesAdapter() }
@@ -436,8 +435,9 @@ class CustomRulesFragment : ToolbarFragment(), Toolbar.OnMenuItemClickListener, 
                 is URL -> acl.urls.add(it)
             }
         }
-        (activity as MainActivity).snackbar().setText(if (Core.trySetPrimaryClip(acl.toString()))
-            R.string.action_export_msg else R.string.action_export_err).show()
+        val success = Core.trySetPrimaryClip(acl.toString())
+        (activity as MainActivity).snackbar().setText(
+                if (success) R.string.action_export_msg else R.string.action_export_err).show()
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean = when (item.itemId) {
@@ -494,15 +494,12 @@ class CustomRulesFragment : ToolbarFragment(), Toolbar.OnMenuItemClickListener, 
         val window = activity.window
         // In the end material_grey_100 is used for background, see AppCompatDrawableManager (very complicated)
         // for dark mode, it's roughly 850? (#303030)
-        window.statusBarColor = ContextCompat.getColor(activity, when {
-            resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES ->
-                android.R.color.black
-            Build.VERSION.SDK_INT >= 23 -> {
-                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-                R.color.material_grey_300
-            }
-            else -> R.color.material_grey_600
-        })
+        val colorId = if (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK !=
+                Configuration.UI_MODE_NIGHT_YES) {
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            R.color.material_grey_300
+        } else android.R.color.black
+        window.statusBarColor = ContextCompat.getColor(activity, colorId)
         activity.menuInflater.inflate(R.menu.custom_rules_selection, menu)
         toolbar.touchscreenBlocksFocus = true
         return true

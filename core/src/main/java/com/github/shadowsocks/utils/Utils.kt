@@ -21,12 +21,12 @@
 package com.github.shadowsocks.utils
 
 import android.annotation.SuppressLint
-import android.content.*
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageInfo
 import android.content.res.Resources
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
-import android.net.Uri
 import android.os.Build
 import android.system.Os
 import android.system.OsConstants
@@ -44,7 +44,7 @@ import java.net.InetAddress
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-fun <T> Iterable<T>.forEachTry(action: (T) -> Unit) {
+inline fun <T> Iterable<T>.forEachTry(action: (T) -> Unit) {
     var result: Exception? = null
     for (element in this) try {
         action(element)
@@ -117,10 +117,6 @@ fun Context.listenForPackageChanges(onetime: Boolean = true, callback: () -> Uni
     })
 }
 
-fun ContentResolver.openBitmap(uri: Uri) =
-        if (Build.VERSION.SDK_INT >= 28) ImageDecoder.decodeBitmap(ImageDecoder.createSource(this, uri))
-        else BitmapFactory.decodeStream(openInputStream(uri))
-
 val PackageInfo.signaturesCompat get() =
     if (Build.VERSION.SDK_INT >= 28) signingInfo.apkContentsSigners else @Suppress("DEPRECATION") signatures
 
@@ -132,7 +128,5 @@ fun Resources.Theme.resolveResourceId(@AttrRes resId: Int): Int {
     if (!resolveAttribute(resId, typedValue, true)) throw Resources.NotFoundException()
     return typedValue.resourceId
 }
-
-val Intent.datas get() = listOfNotNull(data) + (clipData?.asIterable()?.mapNotNull { it.uri } ?: emptyList())
 
 fun Preference.remove() = parent!!.removePreference(this)

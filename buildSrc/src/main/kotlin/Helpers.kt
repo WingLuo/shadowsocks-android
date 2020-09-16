@@ -11,7 +11,7 @@ import org.gradle.kotlin.dsl.getByName
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmOptions
 import java.util.*
 
-const val lifecycleVersion = "2.2.0"
+const val lifecycleVersion = "2.3.0-alpha07"
 
 private val Project.android get() = extensions.getByName<BaseExtension>("android")
 
@@ -24,10 +24,11 @@ val Project.currentFlavor get() = gradle.startParameter.taskRequests.toString().
 
 fun Project.setupCommon() {
     android.apply {
-        compileSdkVersion(29)
+        buildToolsVersion("30.0.2")
+        compileSdkVersion(30)
         defaultConfig {
-            minSdkVersion(21)
-            targetSdkVersion(29)
+            minSdkVersion(23)
+            targetSdkVersion(30)
             testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
         val javaVersion = JavaVersion.VERSION_1_8
@@ -35,14 +36,19 @@ fun Project.setupCommon() {
             sourceCompatibility = javaVersion
             targetCompatibility = javaVersion
         }
+        lintOptions {
+            warning("ExtraTranslation")
+            warning("ImpliedQuantity")
+            informational("MissingTranslation")
+        }
         (this as ExtensionAware).extensions.getByName<KotlinJvmOptions>("kotlinOptions").jvmTarget =
                 javaVersion.toString()
     }
 
     dependencies {
         add("testImplementation", "junit:junit:4.13")
-        add("androidTestImplementation", "androidx.test:runner:1.2.0")
-        add("androidTestImplementation", "androidx.test.espresso:espresso-core:3.2.0")
+        add("androidTestImplementation", "androidx.test:runner:1.3.0")
+        add("androidTestImplementation", "androidx.test.espresso:espresso-core:3.3.0")
     }
 }
 
@@ -50,13 +56,18 @@ fun Project.setupCore() {
     setupCommon()
     android.apply {
         defaultConfig {
-            versionCode = 5010150
-            versionName = "5.1.1-nightly"
+            versionCode = 5010350
+            versionName = "5.1.3-nightly"
         }
         compileOptions.isCoreLibraryDesugaringEnabled = true
-        ndkVersion = "21.1.6352462"
+        lintOptions {
+            disable("BadConfigurationProvider")
+            warning("RestrictedApi")
+            disable("UseAppTint")
+        }
+        ndkVersion = "21.3.6528147"
     }
-    dependencies.add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:1.0.5")
+    dependencies.add("coreLibraryDesugaring", "com.android.tools:desugar_jdk_libs:1.0.9")
 }
 
 private val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
@@ -75,6 +86,7 @@ fun Project.setupApp() {
                 proguardFile(getDefaultProguardFile("proguard-android.txt"))
             }
         }
+        lintOptions.disable("RemoveWorkManagerInitializer")
         packagingOptions {
             exclude("**/*.kotlin_*")
         }
